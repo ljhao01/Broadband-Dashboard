@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}阈值配置 - AI 智能预警{% endblock %}
+{% block body %}
+<div class="min-h-screen flex">
+  <!-- 侧边栏 -->
+  <aside class="w-60 shrink-0 bg-surface-container-lowest border-r border-outline-variant p-4 flex flex-col">
+    <a href="{{ url_for('dashboard', view='workorder') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container-low">
+      <span class="material-symbols-outlined text-primary">hub</span>
+      <span class="font-bold text-on-surface">管控平台</span>
+    </a>
+    <div class="flex-1 mt-4 space-y-1">
+      <a href="{{ url_for('admin_users') }}" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low">
+        <span class="material-symbols-outlined">group</span> 账号权限
+      </a>
+      <a href="{{ url_for('admin_thresholds') }}" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant">
+        <span class="material-symbols-outlined">tune</span> 阈值配置
+      </a>
+      <a href="{{ url_for('dashboard', view='workorder') }}" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low">
+        <span class="material-symbols-outlined">dashboard</span> 返回看板
+      </a>
+    </div>
+    <div class="pt-4 border-t border-outline-variant">
+      <a href="{{ url_for('dashboard', view='workorder') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low">
+        <span class="material-symbols-outlined">dashboard</span> 返回看板
+      </a>
+    </div>
+  </aside>
+
+  <!-- 内容 -->
+  <main class="flex-1 p-6">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-on-surface">AI 阈值预警配置</h1>
+      <p class="text-sm text-on-surface-variant mt-1">自定义各指标阈值，异常数据页面自动高亮、智能预警，保存后实时生效</p>
+    </div>
+    {% if saved is defined %}
+    <div class="mb-4 px-4 py-3 rounded-lg bg-[#d6e3fb] text-[#3b485a] text-sm flex items-center gap-2">
+      <span class="material-symbols-outlined text-base">check_circle</span>
+      指标「{{ saved }}」阈值已更新并实时生效
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for t in thrs %}
+      <div class="card p-4">
+        <form method="POST" action="{{ url_for('update_threshold') }}" class="space-y-3">
+          <input type="hidden" name="id" value="{{ t['id'] }}"/>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-semibold text-on-surface">{{ t['label'] }}</p>
+              <p class="text-xs text-on-surface-variant font-mono">{{ t['indicator'] }}</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full bg-surface-container-low text-on-surface-variant">
+              {{ '数值越高越好' if t['good_is_high'] else '数值越低越好' }}
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-on-surface-variant">达标下限(≥)</label>
+              <input name="min_ok" value="{{ t['min_ok'] if t['min_ok'] is not none else '' }}"
+                     class="w-full border border-outline-variant rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-on-surface-variant">达标上限(≤)</label>
+              <input name="max_ok" value="{{ t['max_ok'] if t['max_ok'] is not none else '' }}"
+                     class="w-full border border-outline-variant rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-on-surface-variant">预警下限</label>
+              <input name="warn_min" value="{{ t['warn_min'] if t['warn_min'] is not none else '' }}"
+                     class="w-full border border-outline-variant rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-on-surface-variant">预警上限</label>
+              <input name="warn_max" value="{{ t['warn_max'] if t['warn_max'] is not none else '' }}"
+                     class="w-full border border-outline-variant rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+          </div>
+          <button type="submit"
+                  class="bg-primary text-on-primary px-4 py-1.5 rounded-lg text-sm hover:bg-primary-container">保存阈值</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Telecom AI Mission Control - User Satisfaction</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "background": "#f8f9fa",
+                        "tertiary-container": "#006394",
+                        "on-tertiary-container": "#b5dcff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-tertiary-fixed-variant": "#004b71",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#e7e8e9",
+                        "secondary-container": "#d6e3fb",
+                        "on-surface": "#191c1d",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "surface-container-highest": "#e1e3e4",
+                        "tertiary-fixed-dim": "#8fcdff",
+                        "surface-bright": "#f8f9fa",
+                        "outline": "#737686",
+                        "tertiary": "#004a70",
+                        "on-primary-container": "#cbd6ff",
+                        "surface-variant": "#e1e3e4",
+                        "surface-container-low": "#f3f4f5",
+                        "tertiary-fixed": "#cbe6ff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "secondary-fixed": "#d6e3fb",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#00174b",
+                        "error": "#ba1a1a",
+                        "surface": "#f8f9fa",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#001e30",
+                        "on-background": "#191c1d",
+                        "on-secondary-fixed": "#0f1c2d",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#b4c5ff",
+                        "on-secondary-fixed-variant": "#3b485a",
+                        "surface-container": "#edeeef",
+                        "outline-variant": "#c3c6d7",
+                        "on-secondary-container": "#586579",
+                        "primary": "#003da6",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d9dadb",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-tint": "#0353da",
+                        "secondary-fixed-dim": "#bac7de",
+                        "on-surface-variant": "#434654",
+                        "inverse-surface": "#2e3132",
+                        "secondary": "#525f73",
+                        "primary-container": "#0052d9",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "gutter": "24px",
+                        "md": "16px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-md": ["JetBrains Mono"],
+                        "label-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "60px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .card-surface {
+            background-color: #ffffff;
+            border: 1px solid #EAECF0;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 0.5rem;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 0 20px rgba(0, 82, 217, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen pt-16 md:pl-[280px]">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface flex justify-between items-center w-full px-gutter h-16 fixed top-0 z-50 bg-surface-container dark:bg-surface-container-high border-b border-outline-variant shadow-sm hidden md:flex left-0">
+<div class="flex items-center gap-xl">
+<span class="font-headline-lg text-headline-lg font-bold text-primary dark:text-inverse-primary tracking-tight">Telecom AI Mission Control</span>
+<div class="hidden lg:flex items-center gap-md">
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors px-sm py-xs rounded" href="#">KPIs</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors px-sm py-xs rounded" href="#">Alerts</a>
+<a class="font-label-md text-label-md text-primary dark:text-inverse-primary font-bold border-b-2 border-primary hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors px-sm py-xs rounded" href="#">AI Reports</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors px-sm py-xs rounded" href="#">Network Maps</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-md py-[8px] rounded h-[40px] hover:bg-primary-container transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                AI Insight
+            </button>
+<button class="p-xs rounded-full hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-xs rounded-full hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant">
+<img alt="Operator Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a network operator in a modern control room environment, sharp focus, cool lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAs2Bk88Qd-m4ylAnYVAZdS2RRt900bWd0OTLENW_-NoHr5GVwXcESmrCXqFmpoZWr2gb43UXp3WiLxgM4ObAvPQcHqX-jouy65XKlWzTOkTds3Jv67zIBnCcDXIxaX116KlIYpRKctLNQKwKymgnCiTg5xt2LFYPcrhYXqcEO4wlZJ6xd0DvA7RDR8U3W7xxk3Dur4zN1P2nVRiZjqnKs4TJmkjemy_UqzId2rtc0j169XqrRuO-PNoQ"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="bg-surface dark:bg-inverse-surface border-r border-outline-variant fixed left-0 top-16 h-[calc(100vh-64px)] w-[280px] flex flex-col py-md px-sm gap-xs hidden md:flex z-40">
+<div class="px-sm pb-md border-b border-outline-variant mb-sm">
+<div class="flex items-center gap-sm mb-xs">
+<div class="w-10 h-10 rounded bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined fill text-[24px]">analytics</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary dark:text-inverse-primary leading-tight">Network Intel</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant">AI Pulse: Optimal</p>
+</div>
+</div>
+<button class="w-full mt-sm border border-secondary text-secondary font-label-md text-label-md py-[8px] rounded h-[40px] hover:bg-surface-container-high transition-colors">Generate AI Summary</button>
+</div>
+<div class="flex-1 overflow-y-auto flex flex-col gap-xs">
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="build">build</span>
+                Installation &amp; Maintenance
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="wifi_tethering">wifi_tethering</span>
+                FTTR Wireless
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="signal_cellular_alt">signal_cellular_alt</span>
+                Gigabit Poor-Quality
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="assignment_late">assignment_late</span>
+                Repeat Complaints
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary font-label-sm text-label-sm translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined fill text-[20px]" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+                User Satisfaction
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="devices_other">devices_other</span>
+                Problem Terminals
+            </a>
+</div>
+<div class="border-t border-outline-variant pt-sm flex flex-col gap-xs mt-auto">
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+                Support
+            </a>
+<a class="flex items-center gap-sm px-sm py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="history">history</span>
+                Logs
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="max-w-[1440px] mx-auto p-gutter pb-xl flex flex-col gap-lg">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-md">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface mb-xs">User Satisfaction</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Real-time analysis of customer sentiment and service feedback.</p>
+</div>
+<div class="flex gap-sm">
+<select class="border-outline-variant rounded bg-surface text-on-surface font-label-md text-label-md h-[40px] px-md focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Last 30 Days</option>
+<option>This Quarter</option>
+<option>Year to Date</option>
+</select>
+<button class="bg-surface border border-outline-variant text-on-surface font-label-md text-label-md px-md rounded h-[40px] hover:bg-surface-container-high transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    Export
+                </button>
+</div>
+</header>
+<!-- Top AI Insight Panel (Glassmorphism) -->
+<div class="glass-panel rounded-xl p-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-md relative overflow-hidden">
+<div class="absolute right-0 top-0 w-64 h-64 bg-primary-container opacity-20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+<div class="flex items-start gap-md relative z-10">
+<div class="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">auto_awesome</span>
+</div>
+<div>
+<div class="flex items-center gap-xs mb-xs">
+<h3 class="font-headline-md text-headline-md text-on-surface">AI Sentiment Analysis</h3>
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded font-label-sm text-label-sm">Auto-Generated</span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Overall satisfaction up 4% this month. The primary driver identified is improved FTTR (Fiber to the Room) installation speed in metropolitan areas.</p>
+</div>
+</div>
+<button class="shrink-0 bg-primary text-on-primary font-label-md text-label-md px-md py-[8px] rounded h-[40px] hover:bg-primary-container transition-colors z-10">
+                 View Detailed Report
+             </button>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- CSAT -->
+<div class="card-surface p-md flex flex-col">
+<span class="font-label-md text-label-md text-on-surface-variant mb-sm">Overall CSAT Score</span>
+<div class="flex items-end gap-sm mb-xs">
+<span class="font-display-lg text-display-lg text-on-surface leading-none">92.4</span>
+<span class="text-primary font-label-md text-label-md flex items-center mb-1"><span class="material-symbols-outlined text-[16px]">arrow_upward</span> 1.2%</span>
+</div>
+<div class="w-full bg-surface-container-high h-2 rounded-full mt-auto overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 92.4%"></div>
+</div>
+</div>
+<!-- Good Review Rate -->
+<div class="card-surface p-md flex flex-col">
+<span class="font-label-md text-label-md text-on-surface-variant mb-sm">Good Review Rate</span>
+<div class="flex items-end gap-sm mb-xs">
+<span class="font-display-lg text-display-lg text-on-surface leading-none">88.7%</span>
+<span class="text-primary font-label-md text-label-md flex items-center mb-1"><span class="material-symbols-outlined text-[16px]">arrow_upward</span> 2.5%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-auto">Target: 85.0%</p>
+</div>
+<!-- Bad Review Rate -->
+<div class="card-surface p-md flex flex-col">
+<span class="font-label-md text-label-md text-on-surface-variant mb-sm">Bad Review Rate</span>
+<div class="flex items-end gap-sm mb-xs">
+<span class="font-display-lg text-display-lg text-on-surface leading-none">3.2%</span>
+<span class="text-[#008A00] font-label-md text-label-md flex items-center mb-1"><span class="material-symbols-outlined text-[16px]">arrow_downward</span> 0.8%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-auto">Below threshold (5%)</p>
+</div>
+<!-- NPS -->
+<div class="card-surface p-md flex flex-col">
+<span class="font-label-md text-label-md text-on-surface-variant mb-sm">Net Promoter Score (NPS)</span>
+<div class="flex items-end gap-sm mb-xs">
+<span class="font-display-lg text-display-lg text-on-surface leading-none">64</span>
+<span class="text-on-surface-variant font-label-md text-label-md flex items-center mb-1"><span class="material-symbols-outlined text-[16px]">horizontal_rule</span> 0</span>
+</div>
+<div class="flex gap-1 mt-auto h-2 rounded-full overflow-hidden">
+<div class="bg-[#ba1a1a] h-full" style="width: 15%"></div> <!-- Detractors -->
+<div class="bg-surface-variant h-full" style="width: 21%"></div> <!-- Passives -->
+<div class="bg-[#008A00] h-full" style="width: 64%"></div> <!-- Promoters -->
+</div>
+</div>
+</div>
+<!-- Main Content Layout (Bento Grid) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Trend Graph (Spans 2 cols) -->
+<div class="card-surface lg:col-span-2 p-md flex flex-col">
+<div class="flex justify-between items-center mb-md border-b border-outline-variant pb-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">CSAT Trend vs Target</h2>
+<div class="flex gap-sm">
+<span class="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant">
+<span class="w-3 h-3 rounded-full bg-primary block"></span> Actual
+                        </span>
+<span class="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant">
+<span class="w-3 h-3 border-2 border-outline-variant border-dashed block"></span> Target
+                        </span>
+</div>
+</div>
+<!-- Placeholder for Chart -->
+<div class="flex-1 bg-surface-container-lowest rounded flex items-center justify-center min-h-[300px] border border-outline-variant border-dashed relative">
+<span class="font-body-md text-body-md text-on-surface-variant">Chart Visualization Area</span>
+<!-- Simulated Chart lines via CSS gradients for visual effect -->
+<div class="absolute inset-0 bg-[linear-gradient(to_right,#e1e3e4_1px,transparent_1px),linear-gradient(to_bottom,#e1e3e4_1px,transparent_1px)] bg-[size:40px_40px] opacity-30"></div>
+</div>
+</div>
+<!-- Sentiment Keywords -->
+<div class="card-surface p-md flex flex-col">
+<div class="flex justify-between items-center mb-md border-b border-outline-variant pb-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">Feedback Themes</h2>
+<span class="material-symbols-outlined text-on-surface-variant">format_quote</span>
+</div>
+<div class="flex-1 flex flex-col gap-sm">
+<!-- Positive Theme -->
+<div class="bg-[#e6f4ea] p-sm rounded border border-[#ceead6]">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-[#137333]">Fast Installation</span>
+<span class="font-label-sm text-label-sm text-[#137333] bg-[#ceead6] px-2 rounded-full">42%</span>
+</div>
+<p class="font-body-sm text-body-sm text-[#137333] opacity-80">"Technician arrived early and finished quickly."</p>
+</div>
+<!-- Positive Theme -->
+<div class="bg-[#e6f4ea] p-sm rounded border border-[#ceead6]">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-[#137333]">Stable Connection</span>
+<span class="font-label-sm text-label-sm text-[#137333] bg-[#ceead6] px-2 rounded-full">28%</span>
+</div>
+<p class="font-body-sm text-body-sm text-[#137333] opacity-80">"No drops since the FTTR upgrade."</p>
+</div>
+<!-- Negative Theme -->
+<div class="bg-[#fce8e6] p-sm rounded border border-[#fad2cf]">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-[#c5221f]">Appointment Delay</span>
+<span class="font-label-sm text-label-sm text-[#c5221f] bg-[#fad2cf] px-2 rounded-full">15%</span>
+</div>
+<p class="font-body-sm text-body-sm text-[#c5221f] opacity-80">"Had to reschedule twice."</p>
+</div>
+<!-- Negative Theme -->
+<div class="bg-[#fce8e6] p-sm rounded border border-[#fad2cf]">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-[#c5221f]">Router Placement</span>
+<span class="font-label-sm text-label-sm text-[#c5221f] bg-[#fad2cf] px-2 rounded-full">9%</span>
+</div>
+<p class="font-body-sm text-body-sm text-[#c5221f] opacity-80">"Ugly cables visible in hallway."</p>
+</div>
+</div>
+</div>
+<!-- Grid Ranking -->
+<div class="card-surface p-md flex flex-col lg:col-span-1">
+<div class="flex justify-between items-center mb-md border-b border-outline-variant pb-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">Top Service Grids</h2>
+<span class="material-symbols-outlined text-on-surface-variant">military_tech</span>
+</div>
+<ul class="flex flex-col gap-sm">
+<li class="flex items-center justify-between p-sm hover:bg-surface-container-lowest rounded transition-colors">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-[#fbbc04] text-white flex items-center justify-center font-label-sm text-label-sm font-bold">1</div>
+<span class="font-label-md text-label-md text-on-surface">Downtown Core</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">98.2% CSAT</span>
+</li>
+<li class="flex items-center justify-between p-sm hover:bg-surface-container-lowest rounded transition-colors">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-[#9aa0a6] text-white flex items-center justify-center font-label-sm text-label-sm font-bold">2</div>
+<span class="font-label-md text-label-md text-on-surface">North Tech Park</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">96.5% CSAT</span>
+</li>
+<li class="flex items-center justify-between p-sm hover:bg-surface-container-lowest rounded transition-colors">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-[#b87333] text-white flex items-center justify-center font-label-sm text-label-sm font-bold">3</div>
+<span class="font-label-md text-label-md text-on-surface">West Residential</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">94.1% CSAT</span>
+</li>
+<li class="flex items-center justify-between p-sm hover:bg-surface-container-lowest rounded transition-colors">
+<div class="flex items-center gap-sm">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-sm text-label-sm">4</div>
+<span class="font-label-md text-label-md text-on-surface">East Industrial</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant">91.8% CSAT</span>
+</li>
+</ul>
+</div>
+<!-- Unsatisfied Cases List -->
+<div class="card-surface lg:col-span-2 p-md flex flex-col overflow-hidden">
+<div class="flex justify-between items-center mb-md border-b border-outline-variant pb-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">Recent 'Unsatisfied' Cases</h2>
+<button class="text-primary font-label-md text-label-md hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant">
+<th class="font-label-sm text-label-sm text-on-surface-variant p-sm font-medium">Ticket ID</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant p-sm font-medium">Grid</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant p-sm font-medium">Issue Type</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant p-sm font-medium">Customer Comment</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant p-sm font-medium">Action</th>
+</tr>
+</thead>
+<tbody class="font-label-md text-label-md">
+<tr class="border-b border-surface-variant hover:bg-surface-container-lowest transition-colors">
+<td class="p-sm text-primary font-mono">#TK-8832</td>
+<td class="p-sm text-on-surface">South Valley</td>
+<td class="p-sm"><span class="bg-error-container text-on-error-container px-2 py-1 rounded-full text-[12px]">Slow Speed</span></td>
+<td class="p-sm text-on-surface-variant truncate max-w-[200px]" title="Speed is nowhere near advertised gigabit.">Speed is nowhere near adverti...</td>
+<td class="p-sm"><a class="text-primary hover:underline flex items-center gap-xs" href="#"><span class="material-symbols-outlined text-[16px]">open_in_new</span> Review</a></td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-lowest transition-colors">
+<td class="p-sm text-primary font-mono">#TK-8829</td>
+<td class="p-sm text-on-surface">East Industrial</td>
+<td class="p-sm"><span class="bg-surface-container-highest text-on-surface px-2 py-1 rounded-full text-[12px]">Hardware</span></td>
+<td class="p-sm text-on-surface-variant truncate max-w-[200px]" title="Router keeps rebooting randomly.">Router keeps rebooting rando...</td>
+<td class="p-sm"><a class="text-primary hover:underline flex items-center gap-xs" href="#"><span class="material-symbols-outlined text-[16px]">open_in_new</span> Review</a></td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="p-sm text-primary font-mono">#TK-8815</td>
+<td class="p-sm text-on-surface">Downtown Core</td>
+<td class="p-sm"><span class="bg-surface-container-highest text-on-surface px-2 py-1 rounded-full text-[12px]">Service</span></td>
+<td class="p-sm text-on-surface-variant truncate max-w-[200px]" title="Tech left a mess after drilling.">Tech left a mess after drillin...</td>
+<td class="p-sm"><a class="text-primary hover:underline flex items-center gap-xs" href="#"><span class="material-symbols-outlined text-[16px]">open_in_new</span> Review</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</body></html>
