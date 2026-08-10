@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
-_boot_err.txt
-_boot.txt
-_server_err.txt
-_server_out.txt
+logs/
+references/
+scripts/push.bat
