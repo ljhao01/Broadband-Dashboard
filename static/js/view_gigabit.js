@@ -7,8 +7,9 @@
     async init() {
       await this.load();
     },
-    async load() {
-      const res = await fetch("/api/data/gigabit").then((r) => r.json());
+    async load(refresh) {
+      const url = "/api/data/gigabit" + (refresh ? "?refresh=1" : "");
+      const res = await fetch(url).then((r) => r.json());
       const box = document.getElementById("v-gigabit");
       if (res.error) {
         box.innerHTML = `<div class="text-red-500">加载失败：${res.error}</div>`;

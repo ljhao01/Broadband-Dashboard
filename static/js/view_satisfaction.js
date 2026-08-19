@@ -7,8 +7,9 @@
     async init() {
       await this.load();
     },
-    async load() {
-      const res = await fetch("/api/data/satisfaction").then((r) => r.json());
+    async load(refresh) {
+      const url = "/api/data/satisfaction" + (refresh ? "?refresh=1" : "");
+      const res = await fetch(url).then((r) => r.json());
       const box = document.getElementById("v-satisfaction");
       if (res.error) {
         box.innerHTML = `<div class="text-red-500">加载失败：${res.error}</div>`;

@@ -251,6 +251,31 @@
     /* ===== 高亮区（新洲） ===== */
     .row-xinzhou { background: rgba(255,153,0,.12) !important; }
     .row-xinzhou:hover { background: rgba(255,153,0,.22) !important; }
+    /* ===== 武汉整体汇总行 ===== */
+    .row-wuhan { background: rgba(46,166,255,.14) !important; }
+    .row-wuhan:hover { background: rgba(46,166,255,.24) !important; }
+
+    /* ===== 弱光历史批次 · 月度小日历 ===== */
+    .wl-cal-wrap { padding: 12px 14px; border: 1px solid var(--panel-border); border-radius: 12px; background: rgba(14,28,61,.4); max-width: 360px; }
+    .wl-cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .wl-cal-nav { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--panel-border); background: rgba(46,166,255,.08); color: var(--ink-2); cursor: pointer; transition: background 160ms, color 160ms; }
+    .wl-cal-nav:hover { background: rgba(46,166,255,.22); color: var(--ink-1); }
+    .wl-cal-title { flex: 1; text-align: center; font-weight: 600; font-size: 14px; color: var(--ink-1); letter-spacing: 1px; }
+    .wl-cal-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); margin-left: 6px; }
+    .wl-cal-seltag { display: inline-block; padding: 0 6px; border-radius: 5px; background: rgba(46,166,255,.28); color: var(--accent); }
+    .wl-cal-now { margin-left: 4px; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(25,224,255,.4); background: rgba(25,224,255,.1); color: var(--accent-2); font-size: 11px; cursor: pointer; transition: background 160ms; }
+    .wl-cal-now:hover { background: rgba(25,224,255,.22); }
+    .wl-cal-table { width: 100%; border-collapse: collapse; }
+    .wl-cal-table th, .wl-cal-table td { text-align: center; padding: 5px 2px; }
+    .wl-cal-week { font-size: 11px; font-weight: 600; color: var(--ink-3); }
+    .wl-cal-weekend { color: rgba(255,122,130,.7); }
+    .wl-cal-day { position: relative; width: 36px; height: 32px; line-height: 32px; font-size: 13px; color: var(--ink-2); border-radius: 8px; transition: background 160ms, color 160ms; }
+    .wl-cal-day.wl-cal-has { color: var(--ink-1); background: rgba(46,166,255,.14); }
+    .wl-cal-day.wl-cal-has:hover { background: rgba(46,166,255,.32); }
+    .wl-cal-day.wl-cal-sel { background: rgba(46,166,255,.5); color: #fff; box-shadow: 0 0 0 1px rgba(46,166,255,.8); }
+    .wl-cal-day.wl-cal-today { color: var(--accent-2); }
+    .wl-cal-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-right: 4px; vertical-align: 2px; }
+    .wl-cal-sel .wl-cal-dot, .wl-cal-has .wl-cal-dot { background: #fff; }
 
     /* ===== 滚动条 ===== */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -293,7 +318,40 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-6 relative z-[1]">
-    <nav id="tabs" class="tab-bar mb-6"></nav>
+    <!-- 顶部：新洲区本月汇总（KPI 概览）+ 综合评分 -->
+    <section id="top-summary" class="mb-6">
+      <div class="card mb-4">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 class="card-title">
+            <span class="ic"><span class="material-symbols-rounded">location_on</span></span>
+            新洲区 · 本月汇总
+          </h3>
+          <span class="text-xs" style="color:var(--ink-3)" id="xz-period"></span>
+        </div>
+        <div id="xz-kpis" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 class="card-title">
+            <span class="ic"><span class="material-symbols-rounded">scoreboard</span></span>
+            六大模块综合评分
+            <span class="text-xs font-normal" style="color:var(--ink-3)">
+              按考核权重加权 · 达到挑战值满分 · 未达基准值零分 · 中间线性
+            </span>
+          </h3>
+          <span id="score-total" class="text-xs" style="color:var(--ink-2)"></span>
+        </div>
+        <div id="score-modules" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+    </section>
+
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <nav id="tabs" class="tab-bar"></nav>
+      <button id="btnRefreshAll" class="btn btn-ghost">
+        <span class="material-symbols-rounded" style="font-size:16px">refresh</span>刷新全部数据
+      </button>
+    </div>
     <div id="views" class="view-anim">
       <section id="v-workorder" style="display:none"></section>
       <section id="v-fttr" style="display:none"></section>
@@ -301,6 +359,7 @@
       <section id="v-complaint" style="display:none"></section>
       <section id="v-satisfaction" style="display:none"></section>
       <section id="v-terminal" style="display:none"></section>
+      <section id="v-weaklight" style="display:none"></section>
     </div>
   </main>
 
@@ -322,7 +381,10 @@
   <script src="{{ url_for('static', filename='js/view_complaint.js') }}"></script>
   <script src="{{ url_for('static', filename='js/view_satisfaction.js') }}"></script>
   <script src="{{ url_for('static', filename='js/view_terminal.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/view_weaklight.js') }}"></script>
   <script src="{{ url_for('static', filename='js/complaint_upload.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/weaklight_upload.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
