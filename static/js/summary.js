@@ -1,47 +1,8 @@
-/* summary.js — 顶部新洲汇总 + 综合评分模块
- *  1) 新洲区本月汇总 KPI（投诉总量 / 重复投诉量 / 重复投诉率）— 置顶
- *  2) 综合评分卡：5 大模块按权重 + 基准值/挑战值 线性打分
+/* summary.js — 顶部综合评分模块
+ *  综合评分卡：5 大模块按权重 + 基准值/挑战值 线性打分
  */
 (function (R) {
   "use strict";
-
-  // ---------- 新洲汇总 ----------
-  async function loadXinzhouSummary() {
-    const box = document.getElementById("xz-kpis");
-    const periodEl = document.getElementById("xz-period");
-    if (!box) return;
-    try {
-      const res = await fetch("/api/complaint_chart").then((r) => r.json());
-      const latest = res.latest || {};
-      // 优先用 district_daily（新上传的明细数据），回退到 latest.districts 的新洲汇总
-      let xz = (latest.districts || []).find((d) => d.district === "新洲区") || {};
-      const daily = (res.district_daily && res.district_daily["新洲区"]) || [];
-      const total = daily.reduce((s, d) => s + (d.complaint_count || 0), 0);
-      const rep = daily.reduce((s, d) => s + (d.repeat_count || 0), 0);
-      const complaints = total > 0 ? total : (xz.total_orders != null ? xz.total_orders : "-");
-      const repeats = rep > 0 ? rep : (xz.repeat_users != null ? xz.repeat_users : "-");
-      const rate = total > 0 ? (rep / total * 100).toFixed(2) : (xz.repeat_rate != null ? xz.repeat_rate : "-");
-
-      if (periodEl) {
-        periodEl.textContent = res.has_data && latest.period_start
-          ? `${latest.period_start} ~ ${latest.period_end || ""} (上传于 ${latest.upload_date || ""})`
-          : res.has_data ? "已加载" : "暂无数据";
-      }
-
-      const num = (v) => Number(v);
-      const complaintsCls = complaints === "-" ? "green" : (num(complaints) >= 100 ? "red" : num(complaints) >= 50 ? "yellow" : "green");
-      const repeatsCls = repeats === "-" ? "green" : (num(repeats) >= 5 ? "red" : num(repeats) >= 1 ? "yellow" : "green");
-      const rateCls = rate === "-" ? "green" : (parseFloat(rate) >= 2 ? "red" : parseFloat(rate) >= 0.8 ? "yellow" : "green");
-
-      box.innerHTML = `
-        ${R.kpiCard({ label: "新洲区 · 本月投诉总量", value: complaints, unit: "件", status: complaintsCls })}
-        ${R.kpiCard({ label: "新洲区 · 本月重复投诉量", value: repeats, unit: "件", status: repeatsCls })}
-        ${R.kpiCard({ label: "新洲区 · 重复投诉率", value: rate, unit: "%", status: rateCls })}
-      `;
-    } catch (e) {
-      box.innerHTML = `<div class="text-sm" style="color:var(--ink-3)">汇总加载失败：${e.message}</div>`;
-    }
-  }
 
   // ---------- 综合评分 ----------
   async function loadScoring() {
@@ -130,5 +91,5 @@
     return "#ff7a82";
   }
 
-  R.Summary = { loadXinzhouSummary, loadScoring };
+  R.Summary = { loadScoring };
 })(window.Reports);

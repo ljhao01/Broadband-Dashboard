@@ -332,8 +332,16 @@ def api_scoring():
             return None
 
         # 投诉：单独从 complaint_repository 读取真实最新数据（不读快照）
+        # 聚焦新洲区：取最新批次中「新洲区」的重复投诉率（15 区口径内）
         latest_complaint = complaint_repository.latest_complaint_report()
-        complaint_value = (latest_complaint or {}).get("city_rate")
+        complaint_value = None
+        if latest_complaint:
+            xz = next(
+                (d for d in (latest_complaint.get("districts") or [])
+                 if d.get("district") == "新洲区"),
+                None,
+            )
+            complaint_value = (xz or {}).get("repeat_rate")
 
         results = []
         total_weight = 0.0

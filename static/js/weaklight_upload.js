@@ -28,7 +28,10 @@
         </button>
         <span id="wlUploadStatus" class="text-xs" style="color:var(--ink-3)"></span>
       </div>
-      <div id="wlCalendar" class="mt-3"></div>
+      <div id="wlCalendarRow" class="mt-3 grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
+        <div id="wlCalendar"></div>
+        <div id="wl-ai-summary"></div>
+      </div>
       <div id="wlUploadResult" class="mt-4"></div>
       <div class="mt-3 pt-3 border-t" style="border-color:var(--panel-border)">
         <div class="flex items-center gap-3 flex-wrap">

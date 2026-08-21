@@ -19,6 +19,11 @@ def parse_complaint_report(path):
     - 新增：解析「明细」/「重投用户」sheet，提取每日+区县粒度的投诉量/重复投诉量
     """
     import pandas as pd
+    from datetime import datetime
+
+    # 武汉行政区口径（用户明确：武汉只有 15 个区 = 13 行政区中去掉汉南区 + 东湖高新区 + 武汉经开区 + 长江新区）。
+    # 报表里「汉南区」已并入经开区口径，不应作为独立区县统计，予以排除。
+    WHAN_15 = set(WHAN_ALL_KNOWN) - {"汉南区"}
 
     def _safe_read(sheet):
         try:
@@ -35,7 +40,8 @@ def parse_complaint_report(path):
 
     result = {"ok": True, "error": "", "sheets_found": [], "period": {},
               "city": {}, "district_summary": {}, "xinzhou": {},
-              "wuhan_districts": [], "daily_details": [], "xinzhou_daily": [], "ai_analysis": []}
+              "wuhan_districts": [], "daily_details": [], "xinzhou_daily": [],
+              "xinzhou_repeat_tickets": [], "ai_analysis": []}
 
     # ---- 时间周期解析 ----
     period = {}
@@ -89,7 +95,7 @@ def parse_complaint_report(path):
                 }
                 continue
             std_name = merge_wuhan_district(district_col)
-            if std_name not in WHAN_ALL_KNOWN:
+            if std_name not in WHAN_15:
                 continue
             try:
                 rec = {
@@ -140,6 +146,28 @@ def parse_complaint_report(path):
 
     result["daily_details"] = sorted(agg.values(), key=lambda x: (x["stat_date"], x["district"]))
 
+    # ---- 新洲区重复投诉单（具体账号，用于前端单独展示）----
+    xz_tickets = []
+    for sn in ("重投用户", "明细", "投诉明细", "用户明细"):
+        df = _safe_read(sn)
+        if df is None:
+            continue
+        xz_tickets = _parse_xinzhou_repeat_tickets(df, sn)
+        if xz_tickets:
+            break
+    # 去重：按工单编号/账号去重
+    seen = set()
+    uniq_tickets = []
+    for t in xz_tickets:
+        key = t.get("ticket_no") or t.get("account")
+        if not key:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq_tickets.append(t)
+    result["xinzhou_repeat_tickets"] = uniq_tickets
+
     # 提取新洲区每日数据
     xz_daily_agg = {}
     for rec in daily_details:
@@ -155,49 +183,63 @@ def parse_complaint_report(path):
     # ---- AI 分析结论（重点新洲区）----
     result["ai_analysis"] = _gen_upload_analysis(city, xinzhou, wh_districts, period)
     result["period"] = period
+    # 批次归属月份（用于 complaint_upload.stat_month 隔离）
+    result["stat_month"] = (period.get("start") or "")[:7] or datetime.now().strftime("%Y-%m")
     return result
 
 
 def _parse_detail_sheet(df, sheet_name):
     """解析明细/重投用户 sheet，提取每条记录中的日期、区县、是否重复投诉。
 
-    自动识别列名（兼容「投诉日期」「工单日期」「区县」「所属区县」等常见表头），
+    自动识别列名（兼容「投诉日期」「工单日期」「归属区县」等常见表头），
     并判断「是否重复投诉」列（如含「重复」关键字）。
+    若存在「工单地市/地市」列，则仅保留武汉地市的行（明细 sheet 常为全省数据）。
     返回 list[dict]: [{stat_date, district, complaint_count(1), repeat_count(0或1)}]
     """
+    import re
     import pandas as pd
+    from datetime import datetime
+    # 武汉 15 区口径（汉南区并入经开区，不作为独立区县；保留长江新区）
+    WHAN_15 = set(WHAN_ALL_KNOWN) - {"汉南区"}
     rows = []
-    # 先尝试第一行做表头，不行就用前几行扫描找表头
-    header_row = None
     # 扫描前 5 行找表头行
+    header_row = None
     for scan in range(min(5, len(df))):
         rv = [str(v).strip() for v in df.iloc[scan].tolist() if v is not None and str(v) != "nan"]
         date_like = sum(1 for v in rv if "日期" in v or "时间" in v)
-        dist_like = sum(1 for v in rv if "区" in v or "县" in v or "区域" in v or "归属" in v)
+        dist_like = sum(1 for v in rv if ("区县" in v) or ("区" in v and "归属" in v) or "所属区县" in v or "归属区县" in v)
         if date_like >= 1 and dist_like >= 1:
             header_row = scan
             break
 
     if header_row is None:
-        # 回退：尝试用第一行做表头
-        try:
-            df_h = pd.read_excel(df, header=0) if hasattr(df, 'to_excel') else df
-        except Exception:
-            return rows
+        return rows
 
     # 构建列索引映射
-    headers = [str(v).strip() for v in df.iloc[header_row or 0].tolist()]
+    headers = [str(v).strip() for v in df.iloc[header_row].tolist()]
     date_col = None
     dist_col = None
     repeat_col = None
+    city_col = None  # 工单地市/地市列（用于过滤全省数据仅留武汉）
     for i, h in enumerate(headers):
         hl = h.lower()
         if date_col is None and ("日期" in hl or "时间" in hl):
             date_col = i
-        if dist_col is None and ("区" in hl or "县" in hl or "区域" in hl or "归属" in hl):
+        # 归属区县优先于普通"区/县"（避免误匹配"地市/小区"等）
+        if dist_col is None and ("区县" in hl or "所属区" in hl or "归属区" in hl):
             dist_col = i
         if repeat_col is None and ("重复" in hl or "是否重" in hl):
             repeat_col = i
+        if city_col is None and ("地市" in hl or "所属地市" in hl):
+            city_col = i
+    # 兜底：若没匹配到归属区县，再放宽到"区/县/归属"
+    if dist_col is None:
+        for i, h in enumerate(headers):
+            hl = h.lower()
+            if "区" in hl or "县" in hl or "区域" in hl or "归属" in hl:
+                if hl not in ("工单地市", "地市", "所属地市"):
+                    dist_col = i
+                    break
 
     if date_col is None or dist_col is None:
         return rows
@@ -212,6 +254,12 @@ def _parse_detail_sheet(df, sheet_name):
             if not date_str or not dist_str or date_str == "nan" or dist_str == "nan":
                 continue
 
+            # 若存在地市列，仅保留武汉地市（明细 sheet 常为全省数据）
+            if city_col is not None:
+                city_val = str(row[city_col]).strip() if pd.notna(row[city_col]) else ""
+                if city_val and city_val != "武汉":
+                    continue
+
             # 判断是否重复投诉
             is_repeat = 0
             if repeat_col is not None:
@@ -219,21 +267,18 @@ def _parse_detail_sheet(df, sheet_name):
                 if rv in ("是", "1", "True", "true", "重复", "重投"):
                     is_repeat = 1
 
-            # 日期格式化
-            from datetime import datetime
-            dt = None
-            for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M"):
-                try:
-                    dt = datetime.strptime(date_str[:len(fmt)], fmt)
-                    break
-                except (ValueError, IndexError):
-                    continue
-            if dt is None:
+            # 日期格式化：用正则提取年月日，兼容 20260819 / 2026-08-19 / 2026/8/9 等
+            m = re.search(r"(\d{4})[-/年]?(\d{1,2})[-/月]?(\d{1,2})", date_str)
+            if not m:
                 continue
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if not (1 <= mo <= 12 and 1 <= d <= 31):
+                continue
+            dt = datetime(y, mo, d)
 
-            # 区县名标准化
+            # 区县名标准化（武汉 15 区口径）
             std_dist = merge_wuhan_district(dist_str)
-            if std_dist not in WHAN_ALL_KNOWN:
+            if std_dist not in WHAN_15:
                 continue
 
             rows.append({
@@ -241,6 +286,77 @@ def _parse_detail_sheet(df, sheet_name):
                 "district": std_dist,
                 "complaint_count": 1,
                 "repeat_count": is_repeat,
+            })
+        except Exception:
+            continue
+    return rows
+
+
+def _parse_xinzhou_repeat_tickets(df, sheet_name):
+    """从「重投用户」/明细 sheet 提取新洲区重复投诉的具体账号单子。
+
+    返回 list[dict]: [{stat_date, ticket_no, account, channel, repeat_times}]
+    用于前端"智能总结"中单独列出新洲区重复投诉单。
+    """
+    import re
+    import pandas as pd
+    rows = []
+    # 找表头行
+    header_row = None
+    for scan in range(min(5, len(df))):
+        rv = [str(v).strip() for v in df.iloc[scan].tolist() if v is not None and str(v) != "nan"]
+        date_like = sum(1 for v in rv if "日期" in v or "时间" in v)
+        dist_like = sum(1 for v in rv if "区县" in v or "归属区" in v or "所属区" in v)
+        if date_like >= 1 and dist_like >= 1:
+            header_row = scan
+            break
+    if header_row is None:
+        return rows
+
+    headers = [str(v).strip() for v in df.iloc[header_row].tolist()]
+    date_col = dist_col = ticket_col = account_col = city_col = None
+    for i, h in enumerate(headers):
+        hl = h.lower()
+        if date_col is None and ("日期" in hl or "时间" in hl):
+            date_col = i
+        if dist_col is None and ("区县" in hl or "归属区" in hl or "所属区" in hl):
+            dist_col = i
+        if ticket_col is None and ("工单编号" in hl or "工单id" in hl or "工单号" in hl):
+            ticket_col = i
+        if account_col is None and ("宽带账号" in hl or "账号" in hl or "宽带号" in hl):
+            account_col = i
+        if city_col is None and ("地市" in hl or "所属地市" in hl):
+            city_col = i
+
+    if dist_col is None or date_col is None:
+        return rows
+
+    start = (header_row or 0) + 1
+    for idx in range(start, len(df)):
+        try:
+            row = df.iloc[idx]
+            date_str = str(row[date_col]).strip() if pd.notna(row[date_col]) else ""
+            dist_str = str(row[dist_col]).strip() if pd.notna(row[dist_col]) else ""
+            if not date_str or not dist_str or date_str == "nan" or dist_str == "nan":
+                continue
+            if city_col is not None:
+                cv = str(row[city_col]).strip() if pd.notna(row[city_col]) else ""
+                if cv and cv != "武汉":
+                    continue
+            if merge_wuhan_district(dist_str) != "新洲区":
+                continue
+            m = re.search(r"(\d{4})[-/年]?(\d{1,2})[-/月]?(\d{1,2})", date_str)
+            if not m:
+                continue
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if not (1 <= mo <= 12 and 1 <= d <= 31):
+                continue
+            rows.append({
+                "stat_date": f"{y:04d}-{mo:02d}-{d:02d}",
+                "ticket_no": str(row[ticket_col]).strip() if ticket_col is not None and pd.notna(row[ticket_col]) else "",
+                "account": str(row[account_col]).strip() if account_col is not None and pd.notna(row[account_col]) else "",
+                "channel": "",
+                "repeat_times": "",
             })
         except Exception:
             continue

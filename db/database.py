@@ -641,6 +641,18 @@ def _migrate(conn):
             UNIQUE(batch_id, stat_date, district)
         )
     """)
+    # complaint_repeat_ticket：新洲区重复投诉具体账号单（用于前端单独展示）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS complaint_repeat_ticket (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id INTEGER NOT NULL,
+            stat_date TEXT DEFAULT '',
+            ticket_no TEXT DEFAULT '',
+            account TEXT DEFAULT '',
+            channel TEXT DEFAULT '',
+            UNIQUE(batch_id, ticket_no)
+        )
+    """)
     # score_rule：评分规则表（新增，schema 升级时自动创建）
     conn.execute("""
         CREATE TABLE IF NOT EXISTS score_rule (

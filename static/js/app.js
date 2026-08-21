@@ -74,9 +74,9 @@
 
   async function init() {
     buildTabs();
-    // 顶部：新洲汇总 + 综合评分（独立模块，优先加载）
+    // 顶部：综合评分（独立模块，优先加载）
     if (R.Summary) {
-      await Promise.allSettled([R.Summary.loadXinzhouSummary(), R.Summary.loadScoring()]);
+      await Promise.allSettled([R.Summary.loadScoring()]);
     }
     await loadAll();
     // 默认显示第一个（打开即展示数据库上次数据，无需刷新）
@@ -91,9 +91,9 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px">progress_activity</span>刷新中…';
         await loadAll(true);
-        // 顶部汇总与评分一并刷新
+        // 顶部评分一并刷新
         if (R.Summary) {
-          await Promise.allSettled([R.Summary.loadXinzhouSummary(), R.Summary.loadScoring()]);
+          await Promise.allSettled([R.Summary.loadScoring()]);
         }
         // 刷新后回到当前 Tab
         const active = document.querySelector("#tabs [data-tab].active");

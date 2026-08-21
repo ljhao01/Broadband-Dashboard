@@ -45,50 +45,58 @@ def _format_float(v, digits=2):
 # 1. 重复投诉率
 # ---------------------------------------------------------------------------
 def collect_complaint(conn):
-    """重复投诉率看板：仅保留核心 KPI，明细与趋势由上传模块自行渲染。"""
+    """重复投诉率看板：聚焦新洲区 KPI，明细与趋势由上传模块自行渲染。"""
     thresholds = get_thresholds_map(conn)
     latest = complaint_repository.latest_complaint_report()
 
-    # 默认兜底：未上传报表时给出占位值，避免页面报错
-    city_users = latest["city_users"] if latest else None
-    city_rate = latest["city_rate"] if latest else None
+    # 聚焦新洲区：取最新批次中「新洲区」的重复投诉口径
+    xz = {}
+    if latest:
+        xz = next(
+            (d for d in latest.get("districts", []) if d.get("district") == "新洲区"),
+            {},
+        )
+    xz_users = xz.get("repeat_users") if latest else None
+    xz_rate = xz.get("repeat_rate") if latest else None
+    xz_orders = xz.get("total_orders") if latest else None
 
     kpis = []
     cfg = thresholds.get("repeat_total", {})
     kpis.append({
         "label": "重复投诉总量",
-        "value": city_users if city_users is not None else "-",
+        "value": xz_users if xz_users is not None else "-",
         "unit": "单",
         "status": _status(
-            city_users,
+            xz_users,
             cfg.get("min_ok"), cfg.get("max_ok"),
             cfg.get("warn_min"), cfg.get("warn_max"),
             
         ),
         "warn": _warn(
-            city_users,
+            xz_users,
             cfg.get("min_ok"), cfg.get("max_ok"),
             cfg.get("warn_min"), cfg.get("warn_max"),
         ),
+        "detail": f"新洲区 · 共 {xz_orders if xz_orders is not None else '-'} 件工单" if latest else "",
     })
 
     cfg = thresholds.get("repeat_ratio", {})
     kpis.append({
         "label": "重复投诉占比",
-        "value": _format_float(city_rate),
+        "value": _format_float(xz_rate),
         "unit": "%",
         "status": _status(
-            city_rate,
+            xz_rate,
             cfg.get("min_ok"), cfg.get("max_ok"),
             cfg.get("warn_min"), cfg.get("warn_max"),
             
         ),
         "warn": _warn(
-            city_rate,
+            xz_rate,
             cfg.get("min_ok"), cfg.get("max_ok"),
             cfg.get("warn_min"), cfg.get("warn_max"),
         ),
-        "detail": "武汉整体重复投诉率",
+        "detail": "新洲区重复投诉率",
     })
 
     return {

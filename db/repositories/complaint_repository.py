@@ -46,6 +46,9 @@ def save_complaint_report(res, filename):
     conn = get_conn()
     try:
         now = datetime.now().isoformat(timespec="seconds")
+        # upload_date 使用上传当天（而非 period.start=报表统计起始日），
+        # 让日历打点反映「哪一天上传的」，符合用户业务直觉
+        today_str = datetime.now().strftime("%Y-%m-%d")
         stat_month = res.get("stat_month") or datetime.now().strftime("%Y-%m")
         city = res.get("city", {})
         period = res.get("period", {})
@@ -59,7 +62,7 @@ def save_complaint_report(res, filename):
             """,
             (
                 filename,
-                period.get("start") or now,
+                today_str,
                 stat_month,
                 city.get("repeat_users"),
                 city.get("total_orders"),
@@ -71,14 +74,14 @@ def save_complaint_report(res, filename):
         )
         batch_id = cur.lastrowid
 
-        # 武汉各区汇总
+        # 武汉各区汇总（15 区；表结构无 created_at 列）
         wuhan_districts = res.get("wuhan_districts", [])
         for d in wuhan_districts:
             conn.execute(
                 """
                 INSERT INTO complaint_upload_district
-                  (batch_id, district, repeat_users, total_orders, repeat_rate, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                  (batch_id, district, repeat_users, total_orders, repeat_rate)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     batch_id,
@@ -86,7 +89,6 @@ def save_complaint_report(res, filename):
                     d.get("repeat_users"),
                     d.get("total_orders"),
                     d.get("repeat_rate"),
-                    now,
                 ),
             )
 
@@ -105,6 +107,24 @@ def save_complaint_report(res, filename):
                     row.get("district"),
                     row.get("complaint_count", 0),
                     row.get("repeat_count", 0),
+                ),
+            )
+
+        # 新洲区重复投诉具体账号单（前端单独展示）
+        tickets = res.get("xinzhou_repeat_tickets", [])
+        for t in tickets:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO complaint_repeat_ticket
+                  (batch_id, stat_date, ticket_no, account, channel)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    batch_id,
+                    t.get("stat_date", ""),
+                    t.get("ticket_no", ""),
+                    t.get("account", ""),
+                    t.get("channel", ""),
                 ),
             )
 
@@ -138,7 +158,7 @@ def latest_complaint_report():
             SELECT district, repeat_users, total_orders, repeat_rate
             FROM complaint_upload_district
             WHERE batch_id = ?
-            ORDER BY repeat_rate DESC
+            ORDER BY repeat_rate ASC
             """,
             (row["id"],),
         ).fetchall()
@@ -179,7 +199,7 @@ def complaint_month_summary(month=None):
                 SELECT district, repeat_users, total_orders, repeat_rate
                 FROM complaint_upload_district
                 WHERE batch_id = ?
-                ORDER BY repeat_rate DESC
+                ORDER BY repeat_rate ASC
                 """,
                 (latest["id"],),
             ).fetchall()
@@ -218,6 +238,35 @@ def complaint_month_summary(month=None):
         for district in _districts_with_daily(conn, month):
             district_daily[district] = _district_daily_trend(conn, month, district)
 
+        # 6) 上传日历：按 upload_date 分组，每组保留 created_at 最新一份
+        #    日历跨 stat_month 展示历史批次，方便用户在任意月份切回更早批次
+        upload_calendar = []
+        by_date = {}
+        for b in all_batches:
+            d = b.get("upload_date") or ""
+            if not d:
+                continue
+            # all_batches 已按 created_at DESC 倒序，相同日期的第一条即为该日期最新批次
+            if d not in by_date:
+                by_date[d] = b
+        upload_calendar = sorted(
+            (
+                {
+                    "upload_date": d,
+                    "batch_id": b["id"],
+                    "stat_month": b.get("stat_month"),
+                    "city_users": b.get("city_users"),
+                    "city_orders": b.get("city_orders"),
+                    "city_rate": b.get("city_rate"),
+                }
+                for d, b in by_date.items()
+            ),
+            # 按批次 id 降序（id 越大越新），保证刚上传的批次排最前，
+            # 前端日历默认选中最新上传批次（upload_date 可能更早，不能按它排序）
+            key=lambda x: x["batch_id"],
+            reverse=True,
+        )
+
         return {
             "month": month,
             "has_data": len(batches) > 0,
@@ -226,6 +275,8 @@ def complaint_month_summary(month=None):
             "latest": latest,
             "history": history_months,
             "all_batches": all_batches,
+            # 上传日历打点数据 [{upload_date, batch_id, city_rate, ...}, ...]
+            "upload_calendar": upload_calendar,
             # 兼容旧字段名（前端可能仍引用）
             "xinzhou_daily": district_daily.get("新洲区", []),
             "district_daily": district_daily,
@@ -302,7 +353,7 @@ def complaint_batch_detail(batch_id):
             SELECT district, repeat_users, total_orders, repeat_rate
             FROM complaint_upload_district
             WHERE batch_id = ?
-            ORDER BY repeat_rate DESC
+            ORDER BY repeat_rate ASC
             """,
             (batch_id,),
         ).fetchall()
@@ -318,6 +369,18 @@ def complaint_batch_detail(batch_id):
             (batch_id,),
         ).fetchall()
         batch["daily_details"] = [dict(d) for d in daily]
+
+        # 新洲区重复投诉具体账号单
+        tickets = conn.execute(
+            """
+            SELECT stat_date, ticket_no, account, channel
+            FROM complaint_repeat_ticket
+            WHERE batch_id = ?
+            ORDER BY stat_date
+            """,
+            (batch_id,),
+        ).fetchall()
+        batch["repeat_tickets"] = [dict(t) for t in tickets]
 
         return {"ok": True, "batch": batch}
     finally:

@@ -51,11 +51,11 @@
 
   function renderDashboard(box, res) {
     const latest = res.latest || {};
-    const period = latest.data_date ? `数据日期：${latest.data_date}` : "";
     const kpis = (res.kpis || []).map(R.kpiCard).join("");
 
     box.innerHTML = `
       <div id="wl-upload-wrap"></div>
+
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">${kpis}</div>
 
       <!-- 人员整治排行（新增） -->
@@ -130,6 +130,7 @@
       </div>`;
 
     mountUpload();
+    renderAiSummary(res);
     renderPersonRanking(res);
     renderCommunity(res);
     renderPon(res);
@@ -140,6 +141,71 @@
     // 绑定未整改筛选
     const cb = document.getElementById("wl-unfixed-only");
     if (cb) cb.addEventListener("change", () => renderNewWeak(res));
+  }
+
+  // ---------- 智能总结（自动生成，位于日历右侧） ----------
+  function renderAiSummary(res) {
+    const el = document.getElementById("wl-ai-summary");
+    if (!el) return;
+    const s = res.ai_summary;
+    if (!s || !s.title) {
+      el.innerHTML = `<div class="wl-cal-wrap"><div class="text-sm" style="color:var(--ink-3)">暂无总结数据。</div></div>`;
+      return;
+    }
+    const latest = res.latest || {};
+    const dataDate = latest.data_date || "—";
+    // 状态色：有新增/严重/持续问题则橙/红，否则绿
+    const hasRisk = (s.problems || []).length > 0;
+    const accent = hasRisk ? "#ffb454" : "#2fe3bd";
+    const icon = hasRisk ? "campaign" : "verified";
+
+    // 区块标题
+    const blockTitle = (txt, ic, color) => `
+      <div class="flex items-center gap-1.5 mb-1.5 text-xs font-semibold" style="color:${color};letter-spacing:.5px">
+        <span class="material-symbols-rounded" style="font-size:15px">${ic}</span>${txt}
+      </div>`;
+
+    // 问题所在
+    const probs = (s.problems || []).map((p) => `
+      <li class="flex items-start gap-2">
+        <span class="material-symbols-rounded" style="font-size:15px;color:#ff7a82">error</span>
+        <span class="text-sm" style="color:var(--ink-2)">${p}</span>
+      </li>`).join("");
+    const probsHtml = probs ? `
+      <div class="mb-2.5">
+        ${blockTitle("问题所在", "report", "#ff7a82")}
+        <ul class="space-y-1" style="list-style:none">${probs}</ul>
+      </div>` : "";
+
+    // 谁的片区多 / 重点责任人员
+    const focusHtml = s.focus_person
+      ? `<div class="mb-2.5">
+           ${blockTitle("片区弱光集中（对应人员）", "group", "#ffb454")}
+           <div class="text-sm" style="color:var(--ink-1)">${s.focus_person}</div>
+         </div>` : "";
+
+    // 集中整治优先级
+    const priorityHtml = s.priority
+      ? `<div>
+           ${blockTitle("集中整治建议", "flag", "#2fe3bd")}
+           <div class="text-sm font-medium" style="color:var(--ink-1)">${s.priority}</div>
+         </div>` : "";
+
+    el.innerHTML = `
+      <div class="wl-cal-wrap h-full" style="max-width:none">
+        <div class="wl-cal-head">
+          <span class="material-symbols-rounded" style="font-size:18px;color:${accent}">${icon}</span>
+          <div class="wl-cal-title" style="text-align:left">智能总结</div>
+          <div class="wl-cal-legend">
+            <span class="text-xs" style="color:var(--ink-3)">数据日期</span>
+            <span class="wl-cal-seltag">${dataDate}</span>
+          </div>
+        </div>
+        <div class="text-sm font-semibold mb-2.5 pb-2.5" style="color:var(--ink-1);border-bottom:1px dashed rgba(120,160,220,.16)">${s.title}</div>
+        ${focusHtml}
+        ${probsHtml}
+        ${priorityHtml}
+      </div>`;
   }
 
   // ---------- 人员整治排行（按对应人员） ----------

@@ -1,5 +1,6 @@
 /* view_complaint.js — 重复投诉率看板
- * 武汉整体 KPI（重复投诉 / 重复投诉占比）置顶，上传分析模块随其后
+ * 顶部不再单独展示 KPI（重复投诉总量/占比已并入下方上传模块的「新洲区重点监控」卡片），
+ * 本视图仅负责挂载上传分析模块（日历 + 智能总结 + 柱图 + 排名表）。
  */
 (function (R) {
   "use strict";
@@ -17,55 +18,11 @@
         return;
       }
 
-      // 武汉整体核心 KPI：重复投诉总量 / 重复投诉占比 置顶
-      const kpis = (res.kpis || []).map((k) => {
-        if (k.label === "重复投诉总量") {
-          return `<div id="kpi-repeat-total">${R.kpiCard(k)}</div>`;
-        }
-        if (k.label === "重复投诉占比") {
-          return `<div id="kpi-repeat-ratio">${R.kpiCard(k)}</div>`;
-        }
-        return R.kpiCard(k);
-      }).join("");
+      // 仅渲染上传分析模块（含新洲重点监控、日历、智能总结、柱图、排名表）
+      box.innerHTML = `<div id="upload-wrap"></div>`;
 
-      // 主看板 KPI 放最前
-      box.innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">${kpis}</div>
-        <div id="upload-wrap"></div>`;
-
-      // 上传分析模块（区县动态选择 + 每日趋势）随后
       if (window.FEATURES && window.FEATURES.showUpload && R.ComplaintUpload) {
         R.ComplaintUpload.mount(document.getElementById("upload-wrap"));
-      }
-
-      // 监听月份切换，用上报报表真实值回填 KPI
-      window.addEventListener("complaint:month", (e) => view.updateRealKpis(e.detail.latest));
-    },
-
-    // 用上报报表的城市汇总真实值，覆盖"重复投诉总量/占比"两个 KPI
-    updateRealKpis(latest) {
-      const t = document.getElementById("kpi-repeat-total");
-      const r = document.getElementById("kpi-repeat-ratio");
-      if (t) {
-        const val = latest && latest.city_users != null ? latest.city_users : "-";
-        t.innerHTML = R.kpiCard({
-          label: "重复投诉总量",
-          value: val,
-          unit: "单",
-          status: val === "-" ? "green" : "red",
-          detail: latest ? `${latest.city_orders != null ? latest.city_orders : "-"} 件工单中重复` : "",
-        });
-      }
-      if (r) {
-        const val = latest && latest.city_rate != null ? latest.city_rate : "-";
-        const status = val === "-" ? "green" : val >= 2 ? "red" : val >= 0.8 ? "yellow" : "green";
-        r.innerHTML = R.kpiCard({
-          label: "重复投诉占比",
-          value: val,
-          unit: "%",
-          status,
-          detail: latest ? `武汉整体重复投诉率` : "",
-        });
       }
     },
   };

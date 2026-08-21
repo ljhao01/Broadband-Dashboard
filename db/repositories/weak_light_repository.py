@@ -14,6 +14,7 @@ import re
 from datetime import datetime
 
 from db import get_conn
+from services import llm_service
 
 # 需要关注归属区县
 XINZHOU = "新洲区"
@@ -388,6 +389,21 @@ def _mark_new_vs_prev(conn, new_weaks, batch_id):
     return new_weaks, prev_batch
 
 
+def _recent_history(conn, batch_id, limit=4):
+    """取当前批次之前的最近几批（不含本期），作为「以前的经验」供大模型参考。"""
+    rows = conn.execute(
+        """
+        SELECT data_date, weak_total, weak_rate, avg_rate, sustained_cnt
+        FROM weak_light_upload
+        WHERE id < ?
+        ORDER BY data_date DESC
+        LIMIT ?
+        """,
+        (batch_id, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def weak_light_dashboard():
     """组装弱光看板所需全部数据（基于最新批次）。
 
@@ -532,6 +548,20 @@ def weak_light_dashboard():
         # 人员整治排行：按「对应人员」聚合本批次存量弱光（需整治户数）
         person_ranking = _build_person_ranking(conn, batch_id, person_map)
 
+        # 智能总结：优先让大模型结合历史批次经验输出，未配置/失败自动降级规则模板
+        history = _recent_history(conn, batch_id, limit=4)
+        ai_summary = llm_service.gen_weaklight_summary({
+            "latest": latest,
+            "prev_batch": prev_batch,
+            "history": history,
+            "communities": communities,
+            "pons": pons,
+            "person_ranking": person_ranking,
+            "new_weaks": new_weaks,
+        }) or _gen_intelligent_summary(
+            latest, communities, pons, person_ranking, new_weaks, prev_batch,
+        )
+
         return {
             "has_data": True,
             "latest": latest,
@@ -551,6 +581,7 @@ def weak_light_dashboard():
             "prev_batch": prev_batch,
             "new_weaks_summary": _new_weaks_summary(new_weaks),
             "ai_analysis": _gen_dashboard_analysis(latest, communities, pons),
+            "ai_summary": ai_summary,
         }
     finally:
         conn.close()
@@ -703,6 +734,142 @@ def _gen_dashboard_analysis(latest, communities, pons):
         else:
             tips.append("当前无 PON 口弱光数达到 3 户预警线。")
     return tips
+
+
+def _gen_intelligent_summary(latest, communities, pons, person_ranking, new_weaks, prev_batch):
+    """生成弱光督办「智能总结」（自然语言，供前端在数据日期旁展示）。
+
+    输出结构化字段：
+      - title        : 一句话概括当前整体情况
+      - trend        : 较上次上传的存量弱光变化（上升/下降/持平）
+      - problems     : 问题所在（自然语言清单）
+      - focus_person : 片区弱光最集中的人员（含重点小区），及其整治重点
+      - priority     : 集中整治优先级排序（自然语言）
+    """
+    d = latest.get("data_date") or "本期"
+    weak_total = latest.get("weak_total") or 0
+    avg_rate = latest.get("avg_rate") if latest.get("avg_rate") is not None else latest.get("weak_rate")
+    rate_pct = round((avg_rate or 0) * 100, 3)
+    sustained = latest.get("sustained_cnt") or 0
+    severe = latest.get("severe_cnt") or 0
+    new_cnt = latest.get("new_weak_cnt") or 0
+
+    # ---- 1) 整体情况 ----
+    trend_txt = ""
+    if prev_batch and prev_batch.get("weak_total") is not None:
+        prev_total = prev_batch["weak_total"]
+        delta = (weak_total or 0) - prev_total
+        if delta > 0:
+            trend_txt = f"较上次（{prev_batch.get('data_date')}）回升 {delta} 户，须警惕反弹"
+        elif delta < 0:
+            trend_txt = f"较上次（{prev_batch.get('data_date')}）压降 {abs(delta)} 户，治理初见成效"
+        else:
+            trend_txt = f"较上次（{prev_batch.get('data_date')}）持平"
+    title = (f"【{d}】新洲区存量弱光 {weak_total} 户、平均弱光率 {rate_pct}%，"
+             f"持续 {sustained} 户、严重 {severe} 户、本月新增 {new_cnt} 台。{trend_txt}".rstrip("。") + "。")
+
+    # ---- 2) 问题所在 ----
+    problems = []
+    # 小区集中
+    if communities:
+        top_c = communities[0]
+        # 累计 TOP3 弱光数占总量比例
+        top3_sum = sum(c["weak_count"] for c in communities[:3])
+        ratio = round(top3_sum / weak_total * 100, 1) if weak_total else 0
+        problems.append(f"小区集中度高：TOP1「{top_c['community']}」弱光 {top_c['weak_count']} 户，"
+                        f"TOP3 小区合计 {top3_sum} 户、占存量 {ratio}%，建议按小区集中整治。")
+    # PON 集中
+    hot_pons = [p for p in pons if p["weak_count"] >= 3]
+    if hot_pons:
+        top_p = hot_pons[0]
+        problems.append(f"存在 {len(hot_pons)} 个热点 PON 口（弱光≥3户），最集中「{short_pon(top_p.get('pon'))}」"
+                        f"关联 {top_p.get('weak_count')} 户（{top_p.get('community') or '多小区'}），"
+                        f"疑似分光器/主干光缆质差，建议优先核查。")
+    # 持续 / 严重
+    if sustained:
+        problems.append(f"持续弱光 {sustained} 户长期未闭环，属顽固性问题，需逐户攻坚销号。")
+    if severe:
+        problems.append(f"严重弱光 {severe} 户（谷值<-30dBm），光衰过大，影响用户感知，建议优先上门处置。")
+    # 新增
+    if new_cnt:
+        problems.append(f"本月新增弱光 {new_cnt} 台，存在边整改边新增现象，需前移装维调测质量管控。")
+
+    # ---- 3) 谁的片区多（按对应人员聚合） ----
+    focus_person = ""
+    if person_ranking:
+        top_person = person_ranking[0]
+        ck = "、".join(top_person.get("communities", [])[:2]) or "多小区"
+        focus_person = (f"片区弱光最集中人员：{top_person['person']}"
+                        f"{'（' + top_person.get('phone', '') + '）' if top_person.get('phone') else ''}"
+                        f"，名下待整治 {top_person['count']} 户（持续 {top_person.get('sustained', 0)}、"
+                        f"严重 {top_person.get('severe', 0)}、新增 {top_person.get('new', 0)}），"
+                        f"重点片区为「{ck}」，应列为第一整改责任人。")
+
+    # ---- 4) 集中整治优先级 ----
+    priority = _gen_priority(person_ranking, communities, pons, new_weaks)
+    if not priority:
+        priority = "当前存量弱光治理平稳，建议保持台账跟踪、固化整治标准，防止反弹。"
+
+    return {
+        "title": title,
+        "trend": trend_txt,
+        "problems": problems,
+        "focus_person": focus_person,
+        "priority": priority,
+    }
+
+
+def short_pon(pon):
+    """PON 口名简写（与前端 shortPon 对齐），无则返回原文。"""
+    if not pon:
+        return ""
+    s = str(pon)
+    # 取 OLT 名（如 武汉/新洲区/双柳-OLT003-...）简写为 双柳-OLT003，再加 框/槽/端口
+    m = re.search(r"/([^/]+?)-(OLT\d+)", s)
+    olt = f"{m.group(1)}-{m.group(2)}" if m else s[-30:]
+    parts = s.split("_")
+    pos = parts[1] if len(parts) > 1 else ""
+    return f"{olt} {pos}".strip()
+
+
+def _gen_priority(person_ranking, communities, pons, new_weaks):
+    """按「影响户数 × 严重程度」给出集中整治优先级排序（自然语言，序号自动连续）。"""
+    lines = []
+
+    # 1) 严重弱光优先：基于 person_ranking，severe 数量多的人员优先
+    person_hot = [p for p in person_ranking if p.get("severe") or p.get("sustained")]
+    person_hot.sort(key=lambda p: (p.get("severe", 0), p.get("sustained", 0)), reverse=True)
+    if person_hot:
+        top = person_hot[0]
+        lines.append(f"优先整治「{top['person']}」片区：严重 {top.get('severe', 0)} 户、持续 {top.get('sustained', 0)} 户，"
+                     f"合计 {top.get('count', 0)} 户，投入产出最高，建议今日派单。")
+
+    # 2) 新增未整改且弱光天数长的
+    urgent_new = [n for n in new_weaks if not n.get("is_rectified") and (n.get("weak_days") or 0) > 7]
+    if urgent_new:
+        top_new = urgent_new[0]
+        lines.append(f"新增弱光中「{top_new.get('community') or '—'}」弱光 {top_new.get('weak_days')} 天未整改"
+                     f"{'（对应 ' + top_new.get('technician', '') + '）' if top_new.get('technician') else ''}，"
+                     f"超期风险高，需限期清零。")
+
+    # 3) 热点 PON 集中整治
+    hot_pons = [p for p in pons if p["weak_count"] >= 3]
+    if hot_pons:
+        top_p = hot_pons[0]
+        lines.append(f"热点 PON「{short_pon(top_p.get('pon'))}」（{top_p.get('weak_count')} 户，"
+                     f"{top_p.get('community') or '多小区'}）集中攻坚，可一次解决多户。")
+
+    # 4) 高集中度小区
+    if communities and communities[0].get("weak_count") >= 5:
+        top_c = communities[0]
+        lines.append(f"集中整治「{top_c['community']}」等 TOP 小区，"
+                     f"对应人员「{top_c.get('technician') or '—'}」，按小区整片推进。")
+
+    # 自动连续编号
+    circled = "①②③④⑤⑥⑦⑧⑨⑩"
+    if not lines:
+        return ""
+    return "；".join(f"{circled[i]} {ln}" for i, ln in enumerate(lines))
 
 
 # ---------------------------------------------------------------------------

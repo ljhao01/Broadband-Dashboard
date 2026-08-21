@@ -4,3 +4,15 @@ logs/
 *.log
 references/
 scripts/push.bat
+
+# 本地 SQLite 数据库（含业务数据，不提交）
+ai_dashboard.db
+*.db
+*.db-journal
+*.db-wal
+
+# 临时测试文件
+_notice_test*.txt
+
+# 工作记忆（内部跨会话笔记，不提交）
+.codebuddy/memory/

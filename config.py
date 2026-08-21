@@ -37,3 +37,12 @@ def merge_wuhan_district(name):
     if not name:
         return name
     return WHAN_MERGE_MAP.get(name.strip(), name.strip())
+
+
+# --------------------------------------------------------------------------
+# 大模型（LLM）配置：OpenAI 兼容协议，环境变量注入，未配置自动降级规则模板
+# --------------------------------------------------------------------------
+LLM_BASE_URL = os.environ.get("AI_LLM_BASE_URL", "")    # 如 https://api.deepseek.com/v1
+LLM_API_KEY  = os.environ.get("AI_LLM_API_KEY", "")     # 如 sk-xxxx
+LLM_MODEL    = os.environ.get("AI_LLM_MODEL", "deepseek-chat")
+LLM_TIMEOUT  = int(os.environ.get("AI_LLM_TIMEOUT", "20"))
