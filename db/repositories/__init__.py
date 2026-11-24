@@ -1,2 +1,5 @@
 # -*- coding: utf-8 -*-
-"""数据访问层：按 Repository 模式组织，隔离业务查询与数据库操作。"""
+"""数据访问层包：当前系统仅包含弱光督办模块的数据访问对象。"""
+from . import weak_light_repository
+
+__all__ = ["weak_light_repository"]

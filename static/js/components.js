@@ -41,12 +41,31 @@ window.Reports.registerView = function (v) {
     </span>`;
   }
 
+  // ECharts 是否可用（CDN 不可达/离线时降级，避免整页 ReferenceError）
+  function hasEcharts() {
+    return typeof window.echarts !== "undefined";
+  }
+
+  // 图表不可用时的占位提示
+  function chartFallback(el, msg) {
+    if (!el) return;
+    el.innerHTML = `<div class="flex items-center justify-center h-full text-sm" style="color:var(--ink-3)">
+      <span class="material-symbols-rounded" style="font-size:18px;margin-right:6px">bar_chart</span>
+      ${msg || "图表库未加载，暂不显示图表"}
+    </div>`;
+  }
+
   function _safeInit(box) {
     const el = document.getElementById(box);
     if (!el) return null;
-    const old = echarts.getInstanceByDom(el);
+    if (!hasEcharts()) {
+      chartFallback(el);
+      return null;
+    }
+    const ec = window.echarts;
+    const old = ec.getInstanceByDom(el);
     if (old) old.dispose(); // 重绘前销毁旧实例，避免叠加/闪烁
-    return echarts.init(el);
+    return ec.init(el);
   }
 
   function renderBar(box, labels, values, opts) {
@@ -57,7 +76,7 @@ window.Reports.registerView = function (v) {
       value: values[i],
       itemStyle: {
         borderRadius: [4, 4, 0, 0],
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        color: new window.echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: opts.color || "#2ea6ff" },
           { offset: 1, color: "rgba(46,166,255,.25)" },
         ]),
@@ -80,32 +99,65 @@ window.Reports.registerView = function (v) {
     return chart;
   }
 
-  function renderTrend(box, labels, series) {
+  function renderTrend(box, labels, series, opts) {
+    opts = opts || {};
     const chart = _safeInit(box);
     if (!chart) return null;
     chart.setOption({
       backgroundColor: "transparent",
       tooltip: { trigger: "axis", backgroundColor: "rgba(10,21,48,.9)", borderColor: "rgba(46,166,255,.4)", textStyle: { color: "#eaf2ff" } },
-      legend: { data: series.map((s) => s.name), textStyle: { color: "#a9c2e6" }, top: 0 },
-      grid: { left: 50, right: 20, top: 36, bottom: 30 },
-      xAxis: { type: "category", data: labels, boundaryGap: false, axisLine: CHART_AXIS.axisLine, axisLabel: { color: "#a9c2e6" } },
-      yAxis: { type: "value", axisLine: CHART_AXIS.axisLine, axisLabel: { color: "#a9c2e6" }, splitLine: CHART_AXIS.splitLine },
-      series: series.map((s, i) => ({
-        name: s.name,
-        type: "line",
-        smooth: true,
-        symbol: "circle",
-        symbolSize: 6,
-        lineStyle: { width: 2.5, color: CHART_PALETTE[i % CHART_PALETTE.length] },
-        itemStyle: { color: CHART_PALETTE[i % CHART_PALETTE.length] },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: (CHART_PALETTE[i % CHART_PALETTE.length] + "55") },
-            { offset: 1, color: "transparent" },
-          ]),
-        },
-        data: s.data,
-      })),
+      legend: {
+        data: series.map((s) => s.name),
+        textStyle: { color: "#a9c2e6", fontSize: 11 },
+        itemWidth: 14, itemHeight: 8, top: 0, right: 0,
+      },
+      grid: opts.grid || { left: 46, right: 18, top: 34, bottom: 28 },
+      xAxis: {
+        type: "category",
+        data: labels,
+        boundaryGap: opts.boundaryGap === true,
+        axisLine: CHART_AXIS.axisLine,
+        axisTick: { show: false },
+        axisLabel: { color: "#a9c2e6", fontSize: 11, margin: 8 },
+      },
+      yAxis: {
+        type: "value",
+        name: opts.yName || "户",
+        nameTextStyle: { color: "#6c87b3", fontSize: 11, padding: [0, 0, 4, -26] },
+        minInterval: 1,
+        axisLine: CHART_AXIS.axisLine,
+        axisLabel: { color: "#a9c2e6", fontSize: 11 },
+        splitLine: CHART_AXIS.splitLine,
+      },
+      series: series.map((s, i) => {
+        const color = s.color || CHART_PALETTE[i % CHART_PALETTE.length];
+        return {
+          name: s.name,
+          type: "line",
+          smooth: true,
+          connectNulls: opts.connectNulls === true,
+          symbol: "circle",
+          symbolSize: 7,
+          showSymbol: true,
+          lineStyle: { width: 2.5, color: color },
+          itemStyle: { color: color },
+          areaStyle: s.area === false ? undefined : {
+            color: new window.echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: color + "55" },
+              { offset: 1, color: "transparent" },
+            ]),
+          },
+          label: s.label === false ? undefined : {
+            show: opts.labelValues === true,
+            position: "top",
+            color: color,
+            fontSize: 11,
+            fontWeight: 600,
+          },
+          emphasis: { focus: "series" },
+          data: s.data,
+        };
+      }),
     });
     echartsInstances.push(chart);
     return chart;
@@ -151,4 +203,6 @@ window.Reports.registerView = function (v) {
   R.section = section;
   R.refreshButton = refreshButton;
   R.exportButton = exportButton;
+  R.hasEcharts = hasEcharts;
+  R.chartFallback = chartFallback;
 })(window.Reports);

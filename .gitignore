@@ -10,9 +10,18 @@ ai_dashboard.db
 *.db
 *.db-journal
 *.db-wal
+*.db.bak*
+*ai_dashboard.db.bak*
 
-# 临时测试文件
+# 业务名单（含姓名 / 手机号 / 工号等个人信息，禁止提交）
+*责任田*.csv
+*责任田*.xlsx
+
+# 临时测试文件 / 校验脚本 / 截图
 _notice_test*.txt
+_tmp_*
+_shot_*
+_crop_*
 
 # 工作记忆（内部跨会话笔记，不提交）
-.codebuddy/memory/
+.codebuddy/

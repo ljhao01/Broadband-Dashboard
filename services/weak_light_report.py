@@ -1,28 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-弱光督办报表解析服务（《存量及新增弱光》xlsx）。
+弱光督办报表解析服务。支持两种报表格式，均只保留归属区县 = 新洲区 的数据入库。
 
-解析全部核心 Sheet，仅保留归属区县 = 新洲区 的数据入库：
-- 存量弱光总明细  → 主表（新洲区过滤） → weak_light_detail
-- 存量弱光小区分析 → 新洲区小区聚合    → weak_light_community
-- 存量弱光pon口分析 → 新洲区 PON 聚合   → weak_light_pon
-- 企宽弱光          → 新洲区企宽       → weak_light_enterprise
-- 统计              → 新洲区及武汉各区  → weak_light_stat
-
-新增弱光（weak_light_new）不再读取 excel 的「新增弱光」sheet，
-改为在落库层对比「存量弱光总明细」与上一批次上传的网关SN 判定。
-
+【旧格式】《存量及新增弱光》.xlsx —— 多 Sheet：
+- 存量弱光总明细  → weak_light_detail
+- 存量弱光小区分析 → weak_light_community
+- 存量弱光pon口分析 → weak_light_pon
+- 企宽弱光          → weak_light_enterprise
+- 统计              → weak_light_stat
 数据日期：从文件名识别（如「8月17日」→ 2026-08-17）。
+
+【新格式】《智能网关用户详情报表MM.DD.csv》—— 单表 38 列、GBK 编码：
+- 明细直接来自单表（按 `归属区县` == 新洲区 过滤，并按光功率/弱光次数校验弱光口径）
+- 小区 / PON / 区县统计 均由单表 groupby 聚合生成
+- 无「持续弱光 / 企宽弱光 / 质差小区类型 / 对应师傅 / 统计」信息 → 相应字段置空或 0
+数据日期：取表内 `数据开始时间`（如 20260927 → 2026-09-27）。
+
+两种格式共同约定：新增弱光（weak_light_new）在落库层对比上一批次网关 SN 判定，
+无上一批次基线时不做新增判定。
 """
 import re
 from datetime import datetime
 
-from config import WHAN_ALL_KNOWN, WHAN_SUMMARY_NAMES
+from config import WHAN_ALL_KNOWN, WHAN_SUMMARY_NAMES, XINZHOU_ACTIVE_USERS
 
 # 需要过滤的归属区县
 XINZHOU = "新洲区"
 # 谷值光功率严重弱光阈值（dBm）
 SEVERE_THRESHOLD = -30.0
+# 谷值光功率弱光判定阈值（dBm）：低于该值即判为弱光
+WEAK_THRESHOLD = -27.0
 # PON 口弱光预警阈值（弱光数 ≥ 此值标红，提示分光器/主干光缆问题）
 PON_WARN_THRESHOLD = 3
 
@@ -49,8 +56,16 @@ def _excel_date(value):
 
 
 def parse_weak_light_report(path, filename=""):
-    """解析《存量及新增弱光》报表，返回可落库的结构化数据。"""
+    """解析弱光报表，自动适配两种表格格式。
+
+    - 旧格式：`《存量及新增弱光》.xlsx`（多 Sheet）→ 原逐 Sheet 解析
+    - 新格式：`智能网关用户详情报表MM.DD.csv`（单表 38 列、GBK 编码）→ _parse_gateway_csv
+    """
     import pandas as pd
+
+    # 新格式分发：CSV 单表（智能网关用户详情报表）
+    if str(filename or path).lower().endswith(".csv"):
+        return _parse_gateway_csv(path, filename)
 
     result = {
         "ok": True, "error": "", "sheets_found": [],
@@ -186,6 +201,159 @@ def parse_weak_light_report(path, filename=""):
     return result
 
 
+def _read_gateway_csv(path):
+    """读取智能网关 CSV（GBK 为主，依次尝试多种编码），返回 DataFrame 或 None。"""
+    import pandas as pd
+    for enc in ("utf-8-sig", "gbk", "gb18030", "utf-8"):
+        try:
+            return pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+        except Exception:
+            continue
+    return None
+
+
+def _parse_gateway_csv(path, filename=""):
+    """解析新格式《智能网关用户详情报表 MM.DD.csv》。
+
+    与旧 xlsx（5 个 Sheet）的最大差异：
+    - 单表 38 列，无 Sheet；小区/PON 聚合需自行 groupby 生成；
+    - 无「持续弱光」「企宽弱光」「质差小区类型」「对应师傅」列 → 对应字段置空/0，
+      对应人员完全依赖《责任田》按小区回填；
+    - 无「统计」Sheet → 拿不到活跃用户数与官方弱光率，weak_rate/avg_rate 置 None；
+    - 区县标识：单一 `归属区县` 列（值 == 新洲区）；
+    - 数据日期：取表内 `数据开始时间`（如 20260927 → 2026-09-27），比文件名更可靠。
+    """
+    df = _read_gateway_csv(path)
+    result = {
+        "ok": True, "error": "", "sheets_found": ["智能网关用户详情报表(CSV)"],
+        "format": "gateway_csv",
+        "data_date": None,
+        "summary": {},
+        "details": [], "communities": [], "pons": [],
+        "new_weaks": [], "enterprises": [], "stats": [], "quality_cells": [],
+        "_rows_total": 0, "_rows_xinzhou": 0,
+    }
+    if df is None or len(df) == 0:
+        result["ok"] = False
+        result["error"] = "CSV 读取失败或为空"
+        return result
+
+    result["_rows_total"] = len(df)
+    # 数据日期：优先表内「数据开始时间」
+    raw_date = _s(df.iloc[0].get("数据开始时间")) if "数据开始时间" in df.columns else ""
+    result["data_date"] = _yyyymmdd(raw_date) or _parse_data_date(filename)
+
+    # 区县过滤：新格式以「归属区县」列标识，仅保留新洲区
+    if "归属区县" not in df.columns:
+        result["ok"] = False
+        result["error"] = "缺少「归属区县」列，无法识别区县"
+        return result
+
+    xz = df[df["归属区县"].astype(str).str.strip() == XINZHOU]
+    result["_rows_xinzhou"] = len(xz)
+
+    for _, row in xz.iterrows():
+        valley = _f(row.get("谷值接收光功率(dbm)"))
+        weak_times = _i(row.get("接收光功率弱光次数"))
+        # 弱光判定：该报表本身为弱光用户清单，此处再做一次口径校验（谷值<-27 或 弱光次数>0）
+        if not ((valley is not None and valley < WEAK_THRESHOLD) or weak_times > 0):
+            continue
+        result["details"].append({
+            "gateway_sn": _s(row.get("网关SN")),
+            "account": _idstr(row.get("上网账号")),
+            "mac": _s(row.get("MAC地址")),
+            "active_count": _i(row.get("用户活跃次数")),
+            "valley_power": valley,
+            "peak_power": _f(row.get("峰值接收光功率(dbm)")),
+            "weak_count": weak_times,
+            "community": _s(row.get("归属小区")),
+            "technician": "",          # 新格式无「对应师傅」，由《责任田》按小区回填
+            "olt": _s(row.get("归属OLT")),
+            "pon": _s(row.get("归属PON")),
+            "onu": _s(row.get("归属ONU")),
+            "sustained": False,        # 新格式无「是否持续弱光」
+            "enterprise": False,       # 新格式无企宽标识
+            "is_new": False,           # 由落库层对比上一批次判定
+            "quality_type": "",        # 新格式无「质差小区类型」
+        })
+
+    details = result["details"]
+
+    # ---- 小区聚合（groupby 生成，替代旧格式的「存量弱光小区分析」Sheet） ----
+    comm = {}
+    for d in details:
+        c = d["community"] or "未知小区"
+        rec = comm.setdefault(c, {"community": c, "weak_count": 0, "prev_count": 0,
+                                  "change_val": 0, "quality_type": ""})
+        rec["weak_count"] += 1
+    result["communities"] = sorted(comm.values(), key=lambda x: x["weak_count"], reverse=True)
+
+    # ---- PON 聚合（groupby 生成，替代旧格式的「存量弱光pon口分析」Sheet） ----
+    pon_map = {}
+    for d in details:
+        p = d["pon"]
+        if not p:
+            continue
+        rec = pon_map.setdefault(p, {"pon": p, "weak_count": 0, "prev_count": 0,
+                                     "change_val": 0, "community": "",
+                                     "weak_mark": 0, "quality_type": ""})
+        rec["weak_count"] += 1
+        if not rec["community"]:
+            rec["community"] = d["community"]
+    for rec in pon_map.values():
+        rec["weak_mark"] = 1 if rec["weak_count"] >= PON_WARN_THRESHOLD else 0
+    result["pons"] = sorted(pon_map.values(), key=lambda x: x["weak_count"], reverse=True)
+
+    # ---- 企宽弱光：新格式无该标识，保持为空（无法判定） ----
+    result["enterprises"] = []
+
+    # ---- 区县统计：新格式无「统计」Sheet；弱光率 = 弱光户数 / 新洲区活跃用户数 ----
+    weak_total = len(details)
+    active_users = XINZHOU_ACTIVE_USERS
+    weak_rate = round(weak_total / active_users, 6) if active_users else None
+
+    result["stats"] = [{
+        "district": XINZHOU,
+        "weak_count": weak_total,
+        "weak_rate": weak_rate,
+        "prev_count": 0,
+        "active_users": active_users,
+        "change_count": 0,
+        "change_rate": None,
+        "avg_rate": weak_rate,   # 新洲区平均弱光率（无官方口径，取该计算值）
+    }]
+
+    # ---- 汇总 ----
+    severe_cnt = sum(1 for d in details if (d.get("valley_power") or 0) < SEVERE_THRESHOLD)
+    result["summary"] = {
+        "weak_total": weak_total,
+        "weak_rate": weak_rate,
+        "active_users": active_users,
+        "sustained_cnt": 0,     # 新格式无持续弱光标记
+        "poor_cell_cnt": 0,     # 新格式无质差小区类型
+        "severe_cnt": severe_cnt,
+        "pon_cnt": len(result["pons"]),
+        "new_weak_cnt": 0,      # 由落库层按上一批次对比覆盖
+    }
+    return result
+
+
+def _yyyymmdd(v):
+    """把 20260927 这类 8 位数字日期转成 2026-09-27。"""
+    s = _s(v)
+    if len(s) >= 8 and s[:8].isdigit():
+        return f"{s[0:4]}-{s[4:6]}-{s[6:8]}"
+    return None
+
+
+def _idstr(v):
+    """编号/账号类字段转字符串（去 .0 尾巴，空值返回空串）。"""
+    s = _s(v)
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+
 def _parse_stat_sheet(df):
     """解析「统计」sheet 中的「截止xx日存量弱光情况」主表，仅保留该表各区县数据。
 
@@ -276,6 +444,10 @@ def _parse_data_date(filename):
         return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
     # 无年份：8月17日 → 当年-08-17
     m = re.search(r"(\d{1,2})月(\d{1,2})", filename)
+    if m:
+        return f"{year}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+    # 无年份简写：9.27 / 9-27 → 当年-09-27（智能网关用户详情报表9.27.csv）
+    m = re.search(r"(\d{1,2})[.\-](\d{1,2})(?!\d)", filename)
     if m:
         return f"{year}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
     return None

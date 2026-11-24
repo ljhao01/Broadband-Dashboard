@@ -22,7 +22,7 @@
         <span id="wl-period" class="text-xs" style="color:var(--ink-3)"></span>
       </div>
       <div class="flex items-center gap-3 flex-wrap">
-        <input id="wlFile" type="file" accept=".xlsx,.xls" class="block text-sm" style="color:var(--ink-2)"/>
+        <input id="wlFile" type="file" accept=".xlsx,.xls,.csv" class="block text-sm" style="color:var(--ink-2)"/>
         <button id="btnWlUpload" class="btn btn-primary">
           <span class="material-symbols-rounded" style="font-size:16px">cloud_upload</span>上传解析并保存
         </button>
@@ -324,7 +324,7 @@
           <tbody>${rankRows}</tbody>
         </table>
       </div>` : ""}
-      ${sm.total != null ? `<div class="text-xs mt-2" style="color:var(--ink-3)">新增弱光 ${sm.total} 台 · 未整改 ${sm.unfixed} · 较上次新增 ${sm.new_vs_prev}</div>` : ""}`;
+      ${sm.total != null ? `<div class="text-xs mt-2" style="color:var(--ink-3)">新增弱光 ${sm.total} 台 · 未整改 ${sm.unfixed}</div>` : ""}`;
   }
 
   R.WeakLightUpload = { mount: renderUploadBlock };
